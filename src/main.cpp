@@ -30,7 +30,7 @@ int main()
     constexpr int height = 15;
     constexpr int size = 100;
     constexpr int border = size / 5;
-    constexpr int sleepTimeMs = 1000;
+    constexpr float sleepTimeS = 1;
     
     Rectangle panel {width*size+border, border, size*6-border, height*size-border};
 
@@ -72,16 +72,20 @@ int main()
     bool isEndReached = false;
     bool isStart = false;
     bool isStep = false;
-    float speedValue = 1;
+    float speed = 1;
     float timer = 0;
     while (!WindowShouldClose())
     {
-        if ((isStart && !isEndReached) || isStep)
+        // Sleep for
+        float finaleTimeS = sleepTimeS/speed;
+        if (timer < finaleTimeS && !isStep)
         {
+            timer += GetFrameTime();
+        }
+        else if ((isStart && !isEndReached) || isStep)
+        {
+            timer = 0;
             isStep = false;
-            // Sleep for
-            int finaleTimeMs = sleepTimeMs/static_cast<int>(speedValue);
-            this_thread::sleep_for(chrono::milliseconds(finaleTimeMs));
         
             currentCell->isVisited = true;
             // Find available cells
@@ -185,7 +189,7 @@ int main()
                 if (backStack.empty())
                 {
                     isEndReached = true;
-                    printf("Reach end!\n");
+                    printf("Maze generated!\n");
                     continue;
                 }
                 
@@ -254,7 +258,7 @@ int main()
                     cell.isVisited = false;
                 }
             }
-            if (GuiSlider({x, y + 4*step, panel.width - 2*gap, step*0.25f}, "", "", &speedValue, 1, 10))
+            if (GuiSlider({x, y + 4*step, panel.width - 2*gap, step*0.25f}, "", "", &speed, 1, 20))
             {
                 
             }
