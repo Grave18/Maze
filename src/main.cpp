@@ -5,6 +5,7 @@
 
 #include <raylib.h>
 #define RAYGUI_IMPLEMENTATION
+#include <array>
 #include <raygui.h>
 
 enum Dir
@@ -12,47 +13,16 @@ enum Dir
     North, East, South, West,
 };
 
-class Cell
+struct Cell
 {
-public:
     int x = 0, y = 0;
     bool south = true, east = true, north = true, west = true;
     bool isVisited = false;
     Color color = BLUE;
 };
 
-int main()
+void initCells(auto &cells, const int width, const int height)
 {
-    using namespace std;
-
-    // Settings
-    constexpr int width = 15;
-    constexpr int height = 15;
-    constexpr int size = 100;
-    constexpr int border = size / 5;
-    constexpr float sleepTimeS = 1;
-    
-    Rectangle panel {width*size+border, border, size*6-border, height*size-border};
-
-    constexpr auto wallColor = DARKGRAY;
-    constexpr auto visitedColor = BLUE;
-    constexpr auto unvisitedColor = DARKGREEN;
-    constexpr auto currentColor = RAYWHITE;
-    constexpr auto endColor = MAROON;
-
-    // Cells
-    Cell cells[width * height];
-    Cell* currentCell = &cells[0];
-    const Cell* endCell = &cells[width*height-1];
-    stack<Cell*> backStack;
-
-    int screenWidth = static_cast<int>(width * size + border + panel.width + border);
-    int screenHeight = height*size+border;
-    // Init window
-    InitWindow(screenWidth, screenHeight, "Maze");
-    SetTargetFPS(60);
-    GuiSetStyle(DEFAULT, TEXT_SIZE, screenWidth / 20);
-    
     // Init cells positions
     for (int y = 0; y < height; y++)
     {
@@ -63,6 +33,57 @@ int main()
             cell.y = y;
         }
     }
+}
+
+void addAvailableCell(auto& cells, auto& availableCells, Dir dir, const int nextX, const int nextY, const int gridWidth, const int gridHeight)
+{
+    int index = nextX + nextY * gridWidth;
+    if (nextX >= 0 && nextX < gridWidth && nextY >= 0 && nextY < gridHeight && !cells[index].isVisited)
+    {
+        Cell* availableCell = &cells[index];
+        availableCells.emplace_back(availableCell, dir);
+    }
+}
+
+int main()
+{
+    using namespace std;
+
+    // Settings
+    constexpr int gridWidth = 25;
+    constexpr int gridHeight = 25;
+    constexpr int cellSize = 60;
+    constexpr int border = cellSize / 5;
+    constexpr float sleepTimeS = 1;
+    
+    Rectangle panel
+    {
+        .x = gridWidth*cellSize + border,
+        .y = border,
+        .width = cellSize*6 - border,
+        .height = gridHeight*cellSize - border
+    };
+
+    constexpr auto wallColor = DARKGRAY;
+    constexpr auto visitedColor = BLUE;
+    constexpr auto unvisitedColor = DARKGREEN;
+    constexpr auto currentColor = RAYWHITE;
+    constexpr auto endColor = MAROON;
+
+    // Cells
+    constexpr int cellsCount = gridWidth*gridHeight;
+    array<Cell, cellsCount> cells;
+    initCells(cells, gridWidth, gridHeight);
+    Cell* currentCell = &cells[0];
+    const Cell* endCell = &cells[gridWidth*gridHeight-1];
+    stack<Cell*> backStack;
+
+    // Init window
+    int screenWidth = static_cast<int>(gridWidth*cellSize + border + panel.width + border);
+    int screenHeight = gridHeight*cellSize+border;
+    InitWindow(screenWidth, screenHeight, "Maze");
+    SetTargetFPS(60);
+    GuiSetStyle(DEFAULT, TEXT_SIZE, screenWidth / 20);
 
     // Init random
     random_device randomDevice;
@@ -78,6 +99,7 @@ int main()
     {
         // Sleep for
         float finaleTimeS = sleepTimeS/speed;
+        
         if (timer < finaleTimeS && !isStep)
         {
             timer += GetFrameTime();
@@ -90,62 +112,26 @@ int main()
             currentCell->isVisited = true;
             // Find available cells
             vector<pair<Cell*, Dir>> availableCells;
+            int x = currentCell->x;
+            int y = currentCell->y;
             for (int dir = 0; dir < 4; dir++)
             {
-                int index;
                 switch (dir)
                 {
                 case North:
-                    {
-                        const int nextX = currentCell->x;
-                        const int nextY = currentCell->y - 1;
-                        index = nextX + nextY * width;
-                        if (nextX >= 0 && nextX < width && nextY >= 0 && nextY < height && !cells[index].isVisited)
-                        {
-                            Cell* availableCell = &cells[index];
-                            availableCells.emplace_back(availableCell, North);
-                        }
-                    }
+                    addAvailableCell(cells, availableCells, North, x, y - 1, gridWidth, gridHeight);
                     break;
                 case East:
-                    {
-                        const int nextX = currentCell->x + 1;
-                        const int nextY = currentCell->y;
-                        index = nextX + nextY * width;
-                        if (nextX >= 0 && nextX < width && nextY >= 0 && nextY < height && !cells[index].isVisited)
-                        {
-                            Cell* availableCell = &cells[index];
-                            availableCells.emplace_back(availableCell, East);
-                        }
-                    }
+                    addAvailableCell(cells, availableCells, East, x + 1, y, gridWidth, gridHeight);
                     break;
                 case South:
-                    {
-                        const int nextX = currentCell->x;
-                        const int nextY = currentCell->y + 1;
-                        index = nextX + nextY * width;
-                        if (nextX >= 0 && nextX < width && nextY >= 0 && nextY < height && !cells[index].isVisited)
-                        {
-                            Cell* availableCell = &cells[index];
-                            availableCells.emplace_back(availableCell, South);
-                        }
-                    }
+                    addAvailableCell(cells, availableCells, South, x, y + 1, gridWidth, gridHeight);
                     break;
                 case West:
-                    {
-                        const int nextX = currentCell->x - 1;
-                        const int nextY = currentCell->y;
-                        index = nextX + nextY * width;
-                        if (nextX >= 0 && nextX < width && nextY >= 0 && nextY < height && !cells[index].isVisited)
-                        {
-                            Cell* availableCell = &cells[index];
-                            availableCells.emplace_back(availableCell, West);
-                        }
-                    }
+                    addAvailableCell(cells, availableCells, West, x - 1, y, gridWidth, gridHeight);
                     break;
                 default:
                     printf("ERROR: Index out of range");
-                    index = -1;
                 }
             }
 
@@ -205,9 +191,9 @@ int main()
         
             for(const Cell& cell: cells)
             {
-                const int x = cell.x * size + border;
-                const int y = cell.y * size + border;
-                constexpr int newSize = size - border;
+                const int x = cell.x * cellSize + border;
+                const int y = cell.y * cellSize + border;
+                constexpr int newSize = cellSize - border;
                 
                 Color cellColor;
                 if (cell.x == currentCell->x && cell.y == currentCell->y) cellColor = currentColor;
@@ -219,9 +205,9 @@ int main()
 
                 // Draw walls
                 // Right
-                DrawRectangle(x + size - border, y, border, newSize, cell.east ? wallColor : visitedColor);
+                DrawRectangle(x + cellSize - border, y, border, newSize, cell.east ? wallColor : visitedColor);
                 // Bottom
-                DrawRectangle(x, y + size - border, newSize, border, cell.south ? wallColor : visitedColor);
+                DrawRectangle(x, y + cellSize - border, newSize, border, cell.south ? wallColor : visitedColor);
             }
         
             // Buttons
@@ -258,9 +244,9 @@ int main()
                     cell.isVisited = false;
                 }
             }
-            if (GuiSlider({x, y + 4*step, panel.width - 2*gap, step*0.25f}, "", "", &speed, 1, 20))
+            if (GuiSlider({x, y + 4*step, panel.width - 2*gap, step*0.25f}, "", "", &speed, 1, 60))
             {
-                
+                // Empty
             }
             
         EndDrawing();
