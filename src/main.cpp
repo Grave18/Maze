@@ -1,8 +1,11 @@
-#include <raylib.h>
 #include <stack>
 #include <cstdlib>
 #include <random>
 #include <thread>
+
+#include <raylib.h>
+#define RAYGUI_IMPLEMENTATION
+#include <raygui.h>
 
 enum Dir
 {
@@ -21,18 +24,35 @@ public:
 int main()
 {
     using namespace std;
-    
+
+    // Settings
     constexpr int width = 15;
     constexpr int height = 15;
     constexpr int size = 100;
     constexpr int border = size / 5;
-    constexpr int sleepTime = 75;
+    constexpr int sleepTimeMs = 1000;
     
+    Rectangle panel {width*size+border, border, size*6-border, height*size-border};
+
+    constexpr auto wallColor = DARKGRAY;
+    constexpr auto visitedColor = BLUE;
+    constexpr auto unvisitedColor = DARKGREEN;
+    constexpr auto currentColor = RAYWHITE;
+    constexpr auto endColor = MAROON;
+
+    // Cells
     Cell cells[width * height];
     Cell* currentCell = &cells[0];
     const Cell* endCell = &cells[width*height-1];
     stack<Cell*> backStack;
 
+    int screenWidth = static_cast<int>(width * size + border + panel.width + border);
+    int screenHeight = height*size+border;
+    // Init window
+    InitWindow(screenWidth, screenHeight, "Maze");
+    SetTargetFPS(60);
+    GuiSetStyle(DEFAULT, TEXT_SIZE, screenWidth / 20);
+    
     // Init cells positions
     for (int y = 0; y < height; y++)
     {
@@ -44,18 +64,24 @@ int main()
         }
     }
 
-    InitWindow(width*size+border, height*size+border, "Maze");
-    SetTargetFPS(60);
+    // Init random
     random_device randomDevice;
     mt19937 mt(randomDevice());
 
+    // Start cycle
     bool isEndReached = false;
+    bool isStart = false;
+    bool isStep = false;
+    float speedValue = 1;
+    float timer = 0;
     while (!WindowShouldClose())
     {
-        if (!isEndReached)
+        if ((isStart && !isEndReached) || isStep)
         {
+            isStep = false;
             // Sleep for
-            this_thread::sleep_for(chrono::milliseconds(sleepTime));
+            int finaleTimeMs = sleepTimeMs/static_cast<int>(speedValue);
+            this_thread::sleep_for(chrono::milliseconds(finaleTimeMs));
         
             currentCell->isVisited = true;
             // Find available cells
@@ -171,19 +197,13 @@ int main()
         // Drawing
         BeginDrawing();
         
-            constexpr auto wallColor = DARKGRAY;
-            constexpr auto visitedColor = BLUE;
-            constexpr auto unvisitedColor = DARKGREEN;
-            constexpr auto currentColor = RAYWHITE;
-            constexpr auto endColor = MAROON;
-            constexpr int newSize = size - border;
-        
             ClearBackground(wallColor);
         
             for(const Cell& cell: cells)
             {
                 const int x = cell.x * size + border;
                 const int y = cell.y * size + border;
+                constexpr int newSize = size - border;
                 
                 Color cellColor;
                 if (cell.x == currentCell->x && cell.y == currentCell->y) cellColor = currentColor;
@@ -200,6 +220,45 @@ int main()
                 DrawRectangle(x, y + size - border, newSize, border, cell.south ? wallColor : visitedColor);
             }
         
+            // Buttons
+            DrawRectangleRec(panel, unvisitedColor);
+            const float step = panel.height * 0.1f;
+            const float gap = panel.height * 0.01f;
+            float x = panel.x + gap;
+            float y = panel.y + gap;
+            if (GuiButton({x, y, panel.width - 2*gap, step - 2*gap}, "Start"))
+            {
+                isStart = true;
+            }
+            if (GuiButton({x, y + step, panel.width - 2*gap, step - 2*gap}, "Stop"))
+            {
+                isStart = false;
+            }
+            if (GuiButton({x, y + 2*step, panel.width - 2*gap, step - 2*gap}, "Step"))
+            {
+                isStep = true;
+            }
+            if (GuiButton({x, y + 3*step, panel.width - 2*gap, step - 2*gap}, "Reset"))
+            {
+                isEndReached = false;
+                isStart = false;
+                isStep = false;
+                currentCell = &cells[0];
+                backStack = stack<Cell*>();
+                for (Cell& cell : cells)
+                {
+                    cell.north = true;
+                    cell.east = true;
+                    cell.south = true;
+                    cell.east = true;
+                    cell.isVisited = false;
+                }
+            }
+            if (GuiSlider({x, y + 4*step, panel.width - 2*gap, step*0.25f}, "", "", &speedValue, 1, 10))
+            {
+                
+            }
+            
         EndDrawing();
     }
 
