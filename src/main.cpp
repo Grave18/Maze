@@ -22,10 +22,11 @@ int main()
 {
     using namespace std;
     
+    constexpr int width = 15;
+    constexpr int height = 15;
     constexpr int size = 100;
-    constexpr int border = size / 10;
-    constexpr int width = 10;
-    constexpr int height = 10;
+    constexpr int border = size / 5;
+    constexpr int sleepTime = 75;
     
     Cell cells[width * height];
     Cell* currentCell = &cells[0];
@@ -43,7 +44,7 @@ int main()
         }
     }
 
-    InitWindow(1920, 1080, "Maze");
+    InitWindow(width*size+border, height*size+border, "Maze");
     SetTargetFPS(60);
     random_device randomDevice;
     mt19937 mt(randomDevice());
@@ -54,7 +55,7 @@ int main()
         if (!isEndReached)
         {
             // Sleep for
-            this_thread::sleep_for(chrono::milliseconds(100));
+            this_thread::sleep_for(chrono::milliseconds(sleepTime));
         
             currentCell->isVisited = true;
             // Find available cells
@@ -170,34 +171,33 @@ int main()
         // Drawing
         BeginDrawing();
         
-            ClearBackground(BLACK);
+            constexpr auto wallColor = DARKGRAY;
+            constexpr auto visitedColor = BLUE;
+            constexpr auto unvisitedColor = DARKGREEN;
+            constexpr auto currentColor = RAYWHITE;
+            constexpr auto endColor = MAROON;
+            constexpr int newSize = size - border;
+        
+            ClearBackground(wallColor);
         
             for(const Cell& cell: cells)
             {
-                const int x = cell.x * size;
-                const int y = cell.y * size;
-                constexpr auto wallColor = DARKGRAY;
-                constexpr auto visitedColor = BLUE;
-                constexpr auto unvisitedColor = DARKGREEN;
-                constexpr auto currentColor = RAYWHITE;
-                constexpr auto endColor = MAROON;
+                const int x = cell.x * size + border;
+                const int y = cell.y * size + border;
                 
-                // Draw cell
                 Color cellColor;
                 if (cell.x == currentCell->x && cell.y == currentCell->y) cellColor = currentColor;
                 else if (cell.x == endCell->x && cell.y == endCell->y) cellColor = endColor;
                 else cellColor = cell.isVisited ? visitedColor : unvisitedColor;
-                DrawRectangle(x, y, size, size, cellColor);
+                
+                // Draw cell
+                DrawRectangle(x, y, newSize, newSize, cellColor);
 
                 // Draw walls
-                // Left
-                DrawRectangle(x, y, border, size, cell.west ? wallColor : visitedColor);
-                // Top
-                DrawRectangle(x, y, size, border, cell.north ? wallColor : visitedColor);
                 // Right
-                DrawRectangle(x + size - border, y, border, size, cell.east ? wallColor : visitedColor);
+                DrawRectangle(x + size - border, y, border, newSize, cell.east ? wallColor : visitedColor);
                 // Bottom
-                DrawRectangle(x, y + size - border, size, border, cell.south ? wallColor : visitedColor);
+                DrawRectangle(x, y + size - border, newSize, border, cell.south ? wallColor : visitedColor);
             }
         
         EndDrawing();
