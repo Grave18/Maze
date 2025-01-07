@@ -2,10 +2,10 @@
 #include <cstdlib>
 #include <random>
 #include <thread>
+#include <array>
 
 #include <raylib.h>
 #define RAYGUI_IMPLEMENTATION
-#include <array>
 #include <raygui.h>
 
 enum Dir
@@ -18,7 +18,6 @@ struct Cell
     int x = 0, y = 0;
     bool south = true, east = true, north = true, west = true;
     bool isVisited = false;
-    Color color = BLUE;
 };
 
 void initCells(auto &cells, const int width, const int height)
@@ -50,9 +49,9 @@ int main()
     using namespace std;
 
     // Settings
-    constexpr int gridWidth = 25;
-    constexpr int gridHeight = 25;
-    constexpr int cellSize = 60;
+    constexpr int gridWidth = 20;
+    constexpr int gridHeight = 20;
+    constexpr int cellSize = 75;
     constexpr int border = cellSize / 5;
     constexpr float sleepTimeS = 1;
     
@@ -60,8 +59,8 @@ int main()
     {
         .x = gridWidth*cellSize + border,
         .y = border,
-        .width = cellSize*6 - border,
-        .height = gridHeight*cellSize - border
+        .width = cellSize*gridWidth*0.3f - border,
+        .height = gridHeight*cellSize - border,
     };
 
     constexpr auto wallColor = DARKGRAY;
@@ -131,7 +130,7 @@ int main()
                     addAvailableCell(cells, availableCells, West, x - 1, y, gridWidth, gridHeight);
                     break;
                 default:
-                    printf("ERROR: Index out of range");
+                    fprintf(stderr, "ERROR: Index out of range");
                 }
             }
 
