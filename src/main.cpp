@@ -49,7 +49,7 @@ void addAvailableCell(auto& cells, auto& availableCells, Dir dir, const int next
     }
 }
 
-bool performStep(auto& cells, std::stack<Cell*>& backStack, Cell*& currentCell, const int gridWidth, const int gridHeight, std::mt19937& mt, State& state)
+void performStep(auto& cells, std::stack<Cell*>& backStack, Cell*& currentCell, const int gridWidth, const int gridHeight, std::mt19937& mt, State& state)
 {
     currentCell->isVisited = true;
     // Find available cells
@@ -77,7 +77,7 @@ bool performStep(auto& cells, std::stack<Cell*>& backStack, Cell*& currentCell, 
         }
     }
 
-    // Backtrack or end
+    // Randomly get next cell
     if (!availableCells.empty())
     {
         backStack.push(currentCell);
@@ -110,7 +110,7 @@ bool performStep(auto& cells, std::stack<Cell*>& backStack, Cell*& currentCell, 
         // Set current cell
         currentCell = nextCell;
     }
-    // Randomly get next cell
+    // Backtrack or end
     else
     {
         // Reach end condition
@@ -118,13 +118,13 @@ bool performStep(auto& cells, std::stack<Cell*>& backStack, Cell*& currentCell, 
         {
             state = Pause;
             printf("Maze generated!\n");
-            return true;
         }
-                
-        currentCell = backStack.top();
-        backStack.pop();
+        else
+        {
+            currentCell = backStack.top();
+            backStack.pop();
+        }
     }
-    return false;
 }
 
 int main()
@@ -166,6 +166,7 @@ int main()
     InitWindow(screenWidth, screenHeight, "Maze");
     SetTargetFPS(60);
     GuiSetStyle(DEFAULT, TEXT_SIZE, screenWidth / 20);
+    GuiSetStyle(DEFAULT, TEXT_COLOR_NORMAL, 0x383838FF);
 
     // Init random
     random_device randomDevice;
@@ -262,10 +263,9 @@ int main()
                     cell.isVisited = false;
                 }
             }
-            if (GuiSlider({x, y + 4*step, panel.width - 2*gap, step*0.25f}, "", "", &speed, 1, 60))
-            {
-                // Empty
-            }
+            GuiSetStyle(DEFAULT, TEXT_SIZE, screenWidth / 25);
+            GuiLabel( {x, y + 4*step, panel.width - 2*gap, step - 2*gap}, "Speed:");
+            GuiSlider({x, y + 5*step, panel.width - 2*gap, step*0.25f}, "", "", &speed, 1, 60);
             
         EndDrawing();
     }
