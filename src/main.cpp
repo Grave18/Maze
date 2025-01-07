@@ -13,6 +13,11 @@ enum Dir
     North, East, South, West,
 };
 
+enum State
+{
+    Play, Pause, Step
+};
+
 struct Cell
 {
     int x = 0, y = 0;
@@ -42,6 +47,84 @@ void addAvailableCell(auto& cells, auto& availableCells, Dir dir, const int next
         Cell* availableCell = &cells[index];
         availableCells.emplace_back(availableCell, dir);
     }
+}
+
+bool performStep(auto& cells, std::stack<Cell*>& backStack, Cell*& currentCell, const int gridWidth, const int gridHeight, std::mt19937& mt, State& state)
+{
+    currentCell->isVisited = true;
+    // Find available cells
+    std::vector<std::pair<Cell*, Dir>> availableCells;
+    int x = currentCell->x;
+    int y = currentCell->y;
+    for (int dir = 0; dir < 4; dir++)
+    {
+        switch (dir)
+        {
+        case North:
+            addAvailableCell(cells, availableCells, North, x, y - 1, gridWidth, gridHeight);
+            break;
+        case East:
+            addAvailableCell(cells, availableCells, East, x + 1, y, gridWidth, gridHeight);
+            break;
+        case South:
+            addAvailableCell(cells, availableCells, South, x, y + 1, gridWidth, gridHeight);
+            break;
+        case West:
+            addAvailableCell(cells, availableCells, West, x - 1, y, gridWidth, gridHeight);
+            break;
+        default:
+            fprintf(stderr, "ERROR: Index out of range");
+        }
+    }
+
+    // Backtrack or end
+    if (!availableCells.empty())
+    {
+        backStack.push(currentCell);
+                
+        std::uniform_int_distribution randomGetter(0, static_cast<int>(availableCells.size() - 1));
+        const int randVal = randomGetter(mt);
+        auto [nextCell, direction] = availableCells[randVal];
+
+        // Break walls
+        switch (direction)
+        {
+        case North:
+            currentCell->north = false;
+            nextCell->south = false;
+            break;
+        case East:
+            currentCell->east = false;
+            nextCell->west = false;
+            break;
+        case South:
+            currentCell->south = false;
+            nextCell->north = false;
+            break;
+        case West:
+            currentCell->west = false;
+            nextCell->east = false;
+            break;
+        }
+            
+        // Set current cell
+        currentCell = nextCell;
+    }
+    // Randomly get next cell
+    else
+    {
+        // Reach end condition
+        if (backStack.empty())
+        {
+            state = Pause;
+            printf("Maze generated!\n");
+            return true;
+        }
+                
+        currentCell = backStack.top();
+        backStack.pop();
+    }
+    return false;
 }
 
 int main()
@@ -89,98 +172,36 @@ int main()
     mt19937 mt(randomDevice());
 
     // Start cycle
-    bool isEndReached = false;
-    bool isStart = false;
-    bool isStep = false;
+    State state = Pause;
     float speed = 1;
     float timer = 0;
     while (!WindowShouldClose())
     {
-        // Sleep for
-        float finaleTimeS = sleepTimeS/speed;
-        
-        if (timer < finaleTimeS && !isStep)
+        switch (state)
         {
-            timer += GetFrameTime();
-        }
-        else if ((isStart && !isEndReached) || isStep)
-        {
-            timer = 0;
-            isStep = false;
-        
-            currentCell->isVisited = true;
-            // Find available cells
-            vector<pair<Cell*, Dir>> availableCells;
-            int x = currentCell->x;
-            int y = currentCell->y;
-            for (int dir = 0; dir < 4; dir++)
+        case Play:
             {
-                switch (dir)
+                // Sleep for
+                float finaleTimeS = sleepTimeS/speed;
+                if (timer < finaleTimeS)
                 {
-                case North:
-                    addAvailableCell(cells, availableCells, North, x, y - 1, gridWidth, gridHeight);
-                    break;
-                case East:
-                    addAvailableCell(cells, availableCells, East, x + 1, y, gridWidth, gridHeight);
-                    break;
-                case South:
-                    addAvailableCell(cells, availableCells, South, x, y + 1, gridWidth, gridHeight);
-                    break;
-                case West:
-                    addAvailableCell(cells, availableCells, West, x - 1, y, gridWidth, gridHeight);
-                    break;
-                default:
-                    fprintf(stderr, "ERROR: Index out of range");
+                    timer += GetFrameTime();
+                }
+                else
+                {
+                    timer = 0;
+                    performStep(cells, backStack, currentCell, gridWidth, gridHeight, mt, state);
                 }
             }
-
-            // Backtrack or end
-            if (!availableCells.empty())
-            {
-                backStack.push(currentCell);
-                
-                uniform_int_distribution randomGetter(0, static_cast<int>(availableCells.size() - 1));
-                const int randVal = randomGetter(mt);
-                auto [nextCell, direction] = availableCells[randVal];
-
-                // Break walls
-                switch (direction)
-                {
-                case North:
-                    currentCell->north = false;
-                    nextCell->south = false;
-                    break;
-                case East:
-                    currentCell->east = false;
-                    nextCell->west = false;
-                    break;
-                case South:
-                    currentCell->south = false;
-                    nextCell->north = false;
-                    break;
-                case West:
-                    currentCell->west = false;
-                    nextCell->east = false;
-                    break;
-                }
-            
-                // Set current cell
-                currentCell = nextCell;
-            }
-            // Randomly get next cell
-            else
-            {
-                // Reach end condition
-                if (backStack.empty())
-                {
-                    isEndReached = true;
-                    printf("Maze generated!\n");
-                    continue;
-                }
-                
-                currentCell = backStack.top();
-                backStack.pop();
-            }
+            break;
+        case Step:
+            performStep(cells, backStack, currentCell, gridWidth, gridHeight, mt, state);
+            state = Pause;
+            break;
+        case Pause:
+        default:
+            // Do nothing
+            break;
         }
         
         // Drawing
@@ -217,21 +238,19 @@ int main()
             float y = panel.y + gap;
             if (GuiButton({x, y, panel.width - 2*gap, step - 2*gap}, "Start"))
             {
-                isStart = true;
+                state = Play;
             }
             if (GuiButton({x, y + step, panel.width - 2*gap, step - 2*gap}, "Stop"))
             {
-                isStart = false;
+                state = Pause;
             }
             if (GuiButton({x, y + 2*step, panel.width - 2*gap, step - 2*gap}, "Step"))
             {
-                isStep = true;
+                if (state == Pause) state = Step;
             }
             if (GuiButton({x, y + 3*step, panel.width - 2*gap, step - 2*gap}, "Reset"))
             {
-                isEndReached = false;
-                isStart = false;
-                isStep = false;
+                state = Pause;
                 currentCell = &cells[0];
                 backStack = stack<Cell*>();
                 for (Cell& cell : cells)
