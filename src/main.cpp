@@ -233,23 +233,23 @@ int main()
         
             // Buttons
             DrawRectangleRec(panel, unvisitedColor);
-            const float step = panel.height * 0.1f;
             const float gap = panel.height * 0.01f;
+            const float step = panel.height * 0.1f - gap;
             float x = panel.x + gap;
             float y = panel.y + gap;
-            if (GuiButton({x, y, panel.width - 2*gap, step - 2*gap}, "Start"))
+            if (GuiButton({x, y, panel.width - 2*gap, step - gap}, "Start"))
             {
                 state = Play;
             }
-            if (GuiButton({x, y + step, panel.width - 2*gap, step - 2*gap}, "Stop"))
+            if (GuiButton({x, y + step, panel.width - 2*gap, step - gap}, "Stop"))
             {
                 state = Pause;
             }
-            if (GuiButton({x, y + 2*step, panel.width - 2*gap, step - 2*gap}, "Step"))
+            if (GuiButton({x, y + 2*step, panel.width - 2*gap, step - gap}, "Step"))
             {
                 if (state == Pause) state = Step;
             }
-            if (GuiButton({x, y + 3*step, panel.width - 2*gap, step - 2*gap}, "Reset"))
+            if (GuiButton({x, y + 3*step, panel.width - 2*gap, step - gap}, "Reset"))
             {
                 state = Pause;
                 currentCell = &cells[0];
