@@ -39,47 +39,52 @@ void initCells(auto& cells, const int width, const int height)
     }
 }
 
-void addAvailableCell(auto& cells, auto& availableCells, Dir dir, const int nextX, const int nextY, const int gridWidth,
-                      const int gridHeight)
+// Settings
+constexpr int GridWidth = 20;
+constexpr int GridHeight = 20;
+constexpr int CellSize = 75;
+constexpr int Border = CellSize / 5;
+constexpr Rectangle SidePanel
+    {
+        .x = GridWidth * CellSize + Border,
+        .y = Border,
+        .width = CellSize * GridWidth * 0.3f - Border,
+        .height = GridHeight * CellSize - Border,
+    };
+constexpr int ScreenWidthPx = static_cast<int>(GridWidth * CellSize + Border + SidePanel.width + Border);
+constexpr int ScreenHeightPx = GridHeight * CellSize + Border;
+
+constexpr auto WallColor = DARKGRAY;
+constexpr auto VisitedColor = BLUE;
+constexpr auto UnvisitedColor = DARKGREEN;
+constexpr auto CurrentColor = RAYWHITE;
+constexpr auto EndColor = MAROON;
+
+void addAvailableCell(auto& cells, auto& availableCells, Dir dir, const int nextX, const int nextY)
 {
-    int index = nextX + nextY * gridWidth;
-    if (nextX >= 0 && nextX < gridWidth && nextY >= 0 && nextY < gridHeight && !cells[index].isVisited)
+    int index = nextX + nextY * GridWidth;
+    if (nextX >= 0 && nextX < GridWidth && nextY >= 0 && nextY < GridHeight && !cells[index].isVisited)
     {
         Cell* availableCell = &cells[index];
         availableCells.emplace_back(availableCell, dir);
     }
 }
 
-void backtrack(auto& cells, std::stack<Cell*>& backStack, Cell*& currentCell, const int gridWidth,
-                 const int gridHeight, std::mt19937& mt, State& state)
+void backtrack(auto& cells, std::stack<Cell*>& backStack, Cell*& currentCell, std::mt19937& mt, State& state)
 {
     constexpr bool isFullBacktrack = false;
     currentCell->isVisited = true;
+    
     // Find available cells
     std::vector<std::pair<Cell*, Dir>> availableCells;
     int x = currentCell->x;
     int y = currentCell->y;
-    for (int dir = 0; dir < 4; dir++)
-    {
-        switch (dir)
-        {
-        case North:
-            addAvailableCell(cells, availableCells, North, x, y - 1, gridWidth, gridHeight);
-            break;
-        case East:
-            addAvailableCell(cells, availableCells, East, x + 1, y, gridWidth, gridHeight);
-            break;
-        case South:
-            addAvailableCell(cells, availableCells, South, x, y + 1, gridWidth, gridHeight);
-            break;
-        case West:
-            addAvailableCell(cells, availableCells, West, x - 1, y, gridWidth, gridHeight);
-            break;
-        default:
-            fprintf(stderr, "ERROR: Index out of range");
-        }
-    }
-
+    
+    addAvailableCell(cells, availableCells, North, x, y - 1);
+    addAvailableCell(cells, availableCells, East, x + 1, y);
+    addAvailableCell(cells, availableCells, South, x, y + 1);
+    addAvailableCell(cells, availableCells, West, x - 1, y);
+    
     // Randomly get next cell
     if (!availableCells.empty())
     {
@@ -134,41 +139,18 @@ int main()
 {
     using namespace std;
 
-    // Settings
-    constexpr int gridWidth = 20;
-    constexpr int gridHeight = 20;
-    constexpr int cellSize = 75;
-    constexpr int border = cellSize / 5;
-    constexpr float sleepTimeS = 1;
-
-    Rectangle panel
-    {
-        .x = gridWidth * cellSize + border,
-        .y = border,
-        .width = cellSize * gridWidth * 0.3f - border,
-        .height = gridHeight * cellSize - border,
-    };
-
-    constexpr auto wallColor = DARKGRAY;
-    constexpr auto visitedColor = BLUE;
-    constexpr auto unvisitedColor = DARKGREEN;
-    constexpr auto currentColor = RAYWHITE;
-    constexpr auto endColor = MAROON;
-
     // Cells
-    constexpr int cellsCount = gridWidth * gridHeight;
+    constexpr int cellsCount = GridWidth * GridHeight;
     array<Cell, cellsCount> cells;
-    initCells(cells, gridWidth, gridHeight);
+    initCells(cells, GridWidth, GridHeight);
     Cell* currentCell = &cells[0];
-    const Cell* endCell = &cells[gridWidth * gridHeight - 1];
+    const Cell* endCell = &cells[GridWidth * GridHeight - 1];
     stack<Cell*> backStack;
 
     // Init window
-    int screenWidth = static_cast<int>(gridWidth * cellSize + border + panel.width + border);
-    int screenHeight = gridHeight * cellSize + border;
-    InitWindow(screenWidth, screenHeight, "Maze");
+    InitWindow(ScreenWidthPx, ScreenHeightPx, "Maze");
     SetTargetFPS(60);
-    GuiSetStyle(DEFAULT, TEXT_SIZE, screenWidth / 20);
+    GuiSetStyle(DEFAULT, TEXT_SIZE, ScreenWidthPx / 20);
     GuiSetStyle(DEFAULT, TEXT_COLOR_NORMAL, 0x383838FF);
 
     // Init random
@@ -186,20 +168,20 @@ int main()
         case Play:
             {
                 // Sleep for
-                float finaleTimeS = sleepTimeS / speed;
-                if (timer < finaleTimeS)
+                const float sleepTimeS = 1 / speed;
+                if (timer < sleepTimeS)
                 {
                     timer += GetFrameTime();
                 }
                 else
                 {
                     timer = 0;
-                    backtrack(cells, backStack, currentCell, gridWidth, gridHeight, mt, state);
+                    backtrack(cells, backStack, currentCell, mt, state);
                 }
             }
             break;
         case Step:
-            backtrack(cells, backStack, currentCell, gridWidth, gridHeight, mt, state);
+            backtrack(cells, backStack, currentCell, mt, state);
             state = Pause;
             break;
         case Pause:
@@ -211,48 +193,48 @@ int main()
         // Drawing
         BeginDrawing();
 
-        ClearBackground(wallColor);
+        ClearBackground(WallColor);
 
         for (const Cell& cell : cells)
         {
-            const int x = cell.x * cellSize + border;
-            const int y = cell.y * cellSize + border;
-            constexpr int newSize = cellSize - border;
+            const int x = cell.x * CellSize + Border;
+            const int y = cell.y * CellSize + Border;
+            constexpr int newSize = CellSize - Border;
 
             Color cellColor;
-            if (cell.x == currentCell->x && cell.y == currentCell->y) cellColor = currentColor;
-            else if (cell.x == endCell->x && cell.y == endCell->y) cellColor = endColor;
-            else cellColor = cell.isVisited ? visitedColor : unvisitedColor;
+            if (cell.x == currentCell->x && cell.y == currentCell->y) cellColor = CurrentColor;
+            else if (cell.x == endCell->x && cell.y == endCell->y) cellColor = EndColor;
+            else cellColor = cell.isVisited ? VisitedColor : UnvisitedColor;
 
             // Draw cell
             DrawRectangle(x, y, newSize, newSize, cellColor);
 
             // Draw walls
             // Right
-            DrawRectangle(x + cellSize - border, y, border, newSize, cell.east ? wallColor : visitedColor);
+            DrawRectangle(x + CellSize - Border, y, Border, newSize, cell.east ? WallColor : VisitedColor);
             // Bottom
-            DrawRectangle(x, y + cellSize - border, newSize, border, cell.south ? wallColor : visitedColor);
+            DrawRectangle(x, y + CellSize - Border, newSize, Border, cell.south ? WallColor : VisitedColor);
         }
 
         // Buttons
-        DrawRectangleRec(panel, unvisitedColor);
-        const float gap = panel.height * 0.01f;
-        const float step = panel.height * 0.1f - gap;
-        float x = panel.x + gap;
-        float y = panel.y + gap;
-        if (GuiButton({x, y, panel.width - 2 * gap, step - gap}, "Start"))
+        DrawRectangleRec(SidePanel, UnvisitedColor);
+        const float gap = SidePanel.height * 0.01f;
+        const float step = SidePanel.height * 0.1f - gap;
+        const float x = SidePanel.x + gap;
+        const float y = SidePanel.y + gap;
+        if (GuiButton({x, y, SidePanel.width - 2 * gap, step - gap}, "Start"))
         {
             state = Play;
         }
-        if (GuiButton({x, y + step, panel.width - 2 * gap, step - gap}, "Stop"))
+        if (GuiButton({x, y + step, SidePanel.width - 2 * gap, step - gap}, "Stop"))
         {
             state = Pause;
         }
-        if (GuiButton({x, y + 2 * step, panel.width - 2 * gap, step - gap}, "Step"))
+        if (GuiButton({x, y + 2 * step, SidePanel.width - 2 * gap, step - gap}, "Step"))
         {
             if (state == Pause) state = Step;
         }
-        if (GuiButton({x, y + 3 * step, panel.width - 2 * gap, step - gap}, "Reset"))
+        if (GuiButton({x, y + 3 * step, SidePanel.width - 2 * gap, step - gap}, "Reset"))
         {
             state = Pause;
             currentCell = &cells[0];
@@ -266,9 +248,9 @@ int main()
                 cell.isVisited = false;
             }
         }
-        GuiSetStyle(DEFAULT, TEXT_SIZE, screenWidth / 25);
-        GuiLabel({x, y + 4 * step, panel.width - 2 * gap, step - 2 * gap}, "Speed:");
-        GuiSlider({x, y + 5 * step, panel.width - 2 * gap, step * 0.25f}, "", "", &speed, 1, 60);
+        GuiSetStyle(DEFAULT, TEXT_SIZE, ScreenWidthPx / 25);
+        GuiLabel({x, y + 4 * step, SidePanel.width - 2 * gap, step - 2 * gap}, "Speed:");
+        GuiSlider({x, y + 5 * step, SidePanel.width - 2 * gap, step * 0.25f}, "", "", &speed, 1, 60);
 
         EndDrawing();
     }
