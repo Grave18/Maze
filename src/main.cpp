@@ -13,6 +13,11 @@ enum Dir
     North, East, South, West,
 };
 
+enum Algorithm
+{
+    Backtrack, OriginShift,
+};
+
 enum State
 {
     Play, Pause, Step
@@ -20,24 +25,13 @@ enum State
 
 struct Cell
 {
-    int x = 0, y = 0;
-    bool south = true, east = true, north = true, west = true;
-    bool isVisited = false;
+    int x=0, y=0;
+    // Walls
+    bool south=false, east=false;
+    bool isVisited=false;
+    Cell* pointedCell = nullptr;
 };
 
-void initCells(auto& cells, const int width, const int height)
-{
-    // Init cells positions
-    for (int y = 0; y < height; y++)
-    {
-        for (int x = 0; x < width; x++)
-        {
-            Cell& cell = cells[x + y * width];
-            cell.x = x;
-            cell.y = y;
-        }
-    }
-}
 
 // Settings
 constexpr int GridWidth = 20;
@@ -59,6 +53,22 @@ constexpr auto VisitedColor = BLUE;
 constexpr auto UnvisitedColor = DARKGREEN;
 constexpr auto CurrentColor = RAYWHITE;
 constexpr auto EndColor = MAROON;
+
+void initBacktrack(auto& cells)
+{
+    // Init cells positions
+    for (int y = 0; y < GridHeight; y++)
+    {
+        for (int x = 0; x < GridWidth; x++)
+        {
+            Cell& cell = cells[x + y * GridWidth];
+            cell.x = x;
+            cell.y = y;
+            cell.south = true;
+            cell.east = true;
+        }
+    }
+}
 
 void addAvailableCell(auto& cells, auto& availableCells, Dir dir, const int nextX, const int nextY)
 {
@@ -98,19 +108,15 @@ void backtrack(auto& cells, std::stack<Cell*>& backStack, Cell*& currentCell, st
         switch (direction)
         {
         case North:
-            currentCell->north = false;
             nextCell->south = false;
             break;
         case East:
             currentCell->east = false;
-            nextCell->west = false;
             break;
         case South:
             currentCell->south = false;
-            nextCell->north = false;
             break;
         case West:
-            currentCell->west = false;
             nextCell->east = false;
             break;
         }
@@ -135,6 +141,157 @@ void backtrack(auto& cells, std::stack<Cell*>& backStack, Cell*& currentCell, st
     }
 }
 
+void recalculateWalls(auto& cells)
+{
+    // Init cells positions
+    for (int y = 0; y < GridHeight; y++)
+    {
+        for (int x = 0; x < GridWidth; x++)
+        {
+            Cell& cell = cells[x + y * GridWidth];
+            Cell* pointedCell = cell.pointedCell;
+            cell.south = true;
+            cell.east = true; 
+
+            // Scip origin cell
+            if (pointedCell == nullptr)
+            {
+                continue;
+            }
+            
+            // West
+            if (cell.x > pointedCell->x)
+            {
+                pointedCell->east = false;
+            }
+            // East
+            else if (cell.x < pointedCell->x)
+            {
+                cell.east = false;
+            }
+            // South
+            else if (cell.y > pointedCell->y)
+            {
+                pointedCell->south = false;
+            }
+            // North
+            else if (cell.y < pointedCell->y)
+            {
+                cell.south = false;
+            }
+        }
+    }
+}
+
+// Origin shift
+void initOriginShift(auto& cells)
+{
+    // Init cells positions
+    for (int y = 0; y < GridHeight; y++)
+    {
+        for (int x = 0; x < GridWidth; x++)
+        {
+            Cell& cell = cells[x + y * GridWidth];
+            cell.x = x;
+            cell.y = y;
+            cell.south = true;
+            cell.east = true;
+            
+            // Last cell is origin
+            if (y == GridHeight - 1 && x == GridWidth - 1)
+            {
+                break;
+            }
+
+            if (x != GridWidth - 1)
+            {
+                cells[x + y * GridWidth].pointedCell = &cells[(x + 1) + y * GridWidth];
+            }
+            else
+            {
+                cells[x + y * GridWidth].pointedCell = &cells[x + (y + 1) * GridWidth];
+            }
+        }
+    }
+
+    recalculateWalls(cells);
+}
+
+bool tryGetCell(auto& cells, Cell*& currentCell, const int x, const int y)
+{
+    if (x >= 0 && x < GridWidth && y >= 0 && y < GridHeight)
+    {
+        currentCell = &cells[x + y * GridWidth];
+        return true;
+    }
+
+    return false;
+}
+
+void originShift(auto& cells, Cell*& currentCell, std::mt19937& mt)
+{
+    int x = currentCell->x;
+    int y = currentCell->y;
+    
+    std::uniform_int_distribution randomGetter(0, 3);
+    int randDir = randomGetter(mt);
+    Cell* nextCell = nullptr;
+    while (nextCell == nullptr)
+    {
+        switch (randDir)
+        {
+        case North:
+            if (tryGetCell(cells, nextCell, x, y - 1))
+            {
+                currentCell->pointedCell = nextCell;
+                nextCell->pointedCell = nullptr;
+            }
+            break;
+        case East:
+            if (tryGetCell(cells, nextCell, x + 1, y))
+            {
+                currentCell->pointedCell = nextCell;
+                nextCell->pointedCell = nullptr;
+            }
+            break;
+        case South:
+            if (tryGetCell(cells, nextCell, x, y + 1))
+            {
+                currentCell->pointedCell = nextCell;
+                nextCell->pointedCell = nullptr;
+            }
+            break;
+        case West:
+            if (tryGetCell(cells, nextCell, x - 1, y))
+            {
+                currentCell->pointedCell = nextCell;
+                nextCell->pointedCell = nullptr;
+            }
+            break;
+        default: printf("Random generated unknown direction\n");
+        }
+        randDir = randomGetter(mt);
+    }
+    
+    currentCell = nextCell;
+    recalculateWalls(cells);
+}
+
+void init(auto& cells, Cell*& currentCell,  const Algorithm algorithm)
+{
+    switch (algorithm)
+    {
+    case Backtrack:
+        currentCell = &cells[0];
+        initBacktrack(cells);
+        break;
+    case OriginShift:
+        currentCell = &cells[GridHeight*GridWidth - 1];
+        initOriginShift(cells);
+        break;
+    }
+}
+
 int main()
 {
     using namespace std;
@@ -142,8 +299,7 @@ int main()
     // Cells
     constexpr int cellsCount = GridWidth * GridHeight;
     array<Cell, cellsCount> cells;
-    initCells(cells, GridWidth, GridHeight);
-    Cell* currentCell = &cells[0];
+    Cell* currentCell = nullptr;
     const Cell* endCell = &cells[GridWidth * GridHeight - 1];
     stack<Cell*> backStack;
 
@@ -158,11 +314,21 @@ int main()
     mt19937 mt(randomDevice());
 
     // Start cycle
+    Algorithm algorithm = OriginShift;
+    bool isAlgorythmOpen = false;
+    int algorithmActive = algorithm;
+    const char* algorithmText = "Backtrack;Origin Shift";
+    
     State state = Pause;
     float speed = 1;
     float timer = 0;
+
+    // Init
+    init(cells, currentCell, algorithm);
+    
     while (!WindowShouldClose())
     {
+        // Logic
         switch (state)
         {
         case Play:
@@ -176,12 +342,28 @@ int main()
                 else
                 {
                     timer = 0;
-                    backtrack(cells, backStack, currentCell, mt, state);
+                    switch (algorithm)
+                    {
+                    case Backtrack:
+                        backtrack(cells, backStack, currentCell, mt, state);
+                        break;
+                    case OriginShift:
+                        originShift(cells, currentCell, mt);
+                        break;
+                    }
                 }
             }
             break;
         case Step:
-            backtrack(cells, backStack, currentCell, mt, state);
+            switch (algorithm)
+            {
+            case Backtrack:
+                backtrack(cells, backStack, currentCell, mt, state);
+                break;
+            case OriginShift:
+                originShift(cells, currentCell, mt);
+                break;
+            }
             state = Pause;
             break;
         case Pause:
@@ -195,16 +377,25 @@ int main()
 
         ClearBackground(WallColor);
 
+        constexpr int newSize = CellSize - Border;
         for (const Cell& cell : cells)
         {
             const int x = cell.x * CellSize + Border;
             const int y = cell.y * CellSize + Border;
-            constexpr int newSize = CellSize - Border;
 
             Color cellColor;
-            if (cell.x == currentCell->x && cell.y == currentCell->y) cellColor = CurrentColor;
-            else if (cell.x == endCell->x && cell.y == endCell->y) cellColor = EndColor;
-            else cellColor = cell.isVisited ? VisitedColor : UnvisitedColor;
+            switch (algorithm)
+            {
+            case Backtrack:
+                if (cell.x == currentCell->x && cell.y == currentCell->y) cellColor = CurrentColor;
+                else if (cell.x == endCell->x && cell.y == endCell->y) cellColor = EndColor;
+                else cellColor = cell.isVisited ? VisitedColor : UnvisitedColor;
+                break;
+            case OriginShift:
+                if (cell.x == currentCell->x && cell.y == currentCell->y) cellColor = CurrentColor;
+                else cellColor = VisitedColor;
+                break;
+            }
 
             // Draw cell
             DrawRectangle(x, y, newSize, newSize, cellColor);
@@ -216,42 +407,71 @@ int main()
             DrawRectangle(x, y + CellSize - Border, newSize, Border, cell.south ? WallColor : VisitedColor);
         }
 
+        if (algorithm == OriginShift)
+        {
+            for (const Cell& cell : cells)
+            {
+                const int startX = cell.x * CellSize + Border + newSize/2;
+                const int startY = cell.y * CellSize + Border + newSize/2;
+                    
+                DrawCircle(startX, startY, 5.0f, BLACK);
+                if(cell.pointedCell != nullptr)
+                {
+                    const int endX = cell.pointedCell->x * CellSize + Border + newSize/2;
+                    const int endY = cell.pointedCell->y * CellSize + Border + newSize/2;
+                    DrawLine(startX, startY, endX, endY, BLACK);
+                    float c = 10.0f;
+                    // DrawTriangle({(float)endX - c, (float)endY + c},{(float)endX, (float)endY},{(float)endX-c, (float)endY-c}, RED);
+                }
+            }
+        }
+
         // Buttons
         DrawRectangleRec(SidePanel, UnvisitedColor);
-        const float gap = SidePanel.height * 0.01f;
-        const float step = SidePanel.height * 0.1f - gap;
-        const float x = SidePanel.x + gap;
-        const float y = SidePanel.y + gap;
-        if (GuiButton({x, y, SidePanel.width - 2 * gap, step - gap}, "Start"))
+        constexpr float gap = SidePanel.height * 0.01f;
+        constexpr float x = SidePanel.x + gap;
+        constexpr float y = SidePanel.y + gap;
+        constexpr float step = SidePanel.height * 0.1f - gap;
+        float currStep = 0;
+
+        const int ret = GuiDropdownBox({x, y + currStep, SidePanel.width - 2 * gap, step - gap},
+            algorithmText, &algorithmActive, isAlgorythmOpen);
+        if (ret != 0)
+        {
+            isAlgorythmOpen = !isAlgorythmOpen;
+            if (!isAlgorythmOpen)
+            {
+                algorithm = static_cast<Algorithm>(algorithmActive);
+                init(cells, currentCell, algorithm);
+            }
+        }
+        currStep += 3*step;
+        if (GuiButton({x, y + currStep, SidePanel.width - 2 * gap, step - gap}, "Start"))
         {
             state = Play;
         }
-        if (GuiButton({x, y + step, SidePanel.width - 2 * gap, step - gap}, "Stop"))
+        currStep += step;
+        if (GuiButton({x, y + currStep, SidePanel.width - 2 * gap, step - gap}, "Stop"))
         {
             state = Pause;
         }
-        if (GuiButton({x, y + 2 * step, SidePanel.width - 2 * gap, step - gap}, "Step"))
+        currStep += step;
+        if (GuiButton({x, y + currStep, SidePanel.width - 2 * gap, step - gap}, "Step"))
         {
             if (state == Pause) state = Step;
         }
-        if (GuiButton({x, y + 3 * step, SidePanel.width - 2 * gap, step - gap}, "Reset"))
+        currStep += step;
+        if (GuiButton({x, y + currStep, SidePanel.width - 2 * gap, step - gap}, "Reset"))
         {
             state = Pause;
-            currentCell = &cells[0];
-            backStack = stack<Cell*>();
-            for (Cell& cell : cells)
-            {
-                cell.north = true;
-                cell.east = true;
-                cell.south = true;
-                cell.east = true;
-                cell.isVisited = false;
-            }
+            init(cells, currentCell, algorithm);
         }
+        currStep += step;
         GuiSetStyle(DEFAULT, TEXT_SIZE, ScreenWidthPx / 25);
-        GuiLabel({x, y + 4 * step, SidePanel.width - 2 * gap, step - 2 * gap}, "Speed:");
-        GuiSlider({x, y + 5 * step, SidePanel.width - 2 * gap, step * 0.25f}, "", "", &speed, 1, 60);
-
+        GuiLabel({x, y + currStep, SidePanel.width - 2 * gap, step - 2 * gap}, TextFormat("Speed: %.1f", speed));
+        currStep += step;
+        GuiSlider({x, y + currStep, SidePanel.width - 2 * gap, step * 0.25f}, "", "", &speed, 1, 60);
+        
         EndDrawing();
     }
 
