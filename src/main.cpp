@@ -15,7 +15,7 @@ enum Dir
 
 enum Algorithm
 {
-    Backtrack, OriginShift,
+    Backtrack, OriginShift, AlgorithmSize
 };
 
 enum State
@@ -315,7 +315,7 @@ int main()
 
     // Start cycle
     Algorithm algorithm = OriginShift;
-    bool isAlgorythmOpen = false;
+    bool isAlgorithmOpen = false;
     int algorithmActive = algorithm;
     const char* algorithmText = "Backtrack;Origin Shift";
     
@@ -434,39 +434,50 @@ int main()
         constexpr float step = SidePanel.height * 0.1f - gap;
         float currStep = 0;
 
+        // Dropdown
         const int ret = GuiDropdownBox({x, y + currStep, SidePanel.width - 2 * gap, step - gap},
-            algorithmText, &algorithmActive, isAlgorythmOpen);
+            algorithmText, &algorithmActive, isAlgorithmOpen);
         if (ret != 0)
         {
-            isAlgorythmOpen = !isAlgorythmOpen;
-            if (!isAlgorythmOpen)
+            isAlgorithmOpen = !isAlgorithmOpen;
+            if (!isAlgorithmOpen)
             {
                 algorithm = static_cast<Algorithm>(algorithmActive);
                 init(cells, currentCell, algorithm);
             }
         }
-        currStep += 3*step;
+        currStep += isAlgorithmOpen ? step*AlgorithmSize + step : step;
+        
+        // Start
         if (GuiButton({x, y + currStep, SidePanel.width - 2 * gap, step - gap}, "Start"))
         {
             state = Play;
         }
         currStep += step;
+
+        // Stop
         if (GuiButton({x, y + currStep, SidePanel.width - 2 * gap, step - gap}, "Stop"))
         {
             state = Pause;
         }
         currStep += step;
+
+        // Step
         if (GuiButton({x, y + currStep, SidePanel.width - 2 * gap, step - gap}, "Step"))
         {
             if (state == Pause) state = Step;
         }
         currStep += step;
+
+        // Reset
         if (GuiButton({x, y + currStep, SidePanel.width - 2 * gap, step - gap}, "Reset"))
         {
             state = Pause;
             init(cells, currentCell, algorithm);
         }
         currStep += step;
+        
+        // Speed Slider
         GuiSetStyle(DEFAULT, TEXT_SIZE, ScreenWidthPx / 25);
         GuiLabel({x, y + currStep, SidePanel.width - 2 * gap, step - 2 * gap}, TextFormat("Speed: %.1f", speed));
         currStep += step;
