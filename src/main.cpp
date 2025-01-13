@@ -277,12 +277,17 @@ void originShift(auto& cells, Cell*& currentCell, std::mt19937& mt)
     recalculateWalls(cells);
 }
 
-void init(auto& cells, Cell*& currentCell,  const Algorithm algorithm)
+void init(auto& cells, Cell*& currentCell, std::stack<Cell*>& backStack, const Algorithm algorithm, State& state)
 {
+    state = Pause;
     switch (algorithm)
     {
     case Backtrack:
         currentCell = &cells[0];
+        while (!backStack.empty())
+        {
+            backStack.pop();
+        }
         initBacktrack(cells);
         break;
     case OriginShift:
@@ -324,7 +329,7 @@ int main()
     float timer = 0;
 
     // Init
-    init(cells, currentCell, algorithm);
+    init(cells, currentCell, backStack, algorithm, state);
     
     while (!WindowShouldClose())
     {
@@ -377,6 +382,7 @@ int main()
 
         ClearBackground(WallColor);
 
+        // Draw cells
         constexpr int newSize = CellSize - Border;
         for (const Cell& cell : cells)
         {
@@ -407,21 +413,33 @@ int main()
             DrawRectangle(x, y + CellSize - Border, newSize, Border, cell.south ? WallColor : VisitedColor);
         }
 
+        // Additional stuff for origin shift
         if (algorithm == OriginShift)
         {
             for (const Cell& cell : cells)
             {
                 const int startX = cell.x * CellSize + Border + newSize/2;
                 const int startY = cell.y * CellSize + Border + newSize/2;
-                    
+
+                // Draw debug arrow for cell pointers
                 DrawCircle(startX, startY, 5.0f, BLACK);
                 if(cell.pointedCell != nullptr)
                 {
+                    // Line
                     const int endX = cell.pointedCell->x * CellSize + Border + newSize/2;
                     const int endY = cell.pointedCell->y * CellSize + Border + newSize/2;
-                    DrawLine(startX, startY, endX, endY, BLACK);
-                    float c = 10.0f;
-                    // DrawTriangle({(float)endX - c, (float)endY + c},{(float)endX, (float)endY},{(float)endX-c, (float)endY-c}, RED);
+                    DrawLineEx({(float)startX, (float)startY}, {(float)endX, (float)endY}, CellSize * 0.05f, BLACK);
+                    // Arrow
+                    constexpr float l = CellSize * 0.25f;
+                    constexpr float h = CellSize * 0.1f;
+                    // Right
+                    if (endX > startX) DrawTriangle({(float)endX, (float)endY},{endX-l, endY-h}, {endX - l, endY+h}, BLACK);
+                    // Left
+                    else if (endX < startX) DrawTriangle({(float)endX, (float)endY},{endX+l, endY+h},{endX+l, endY-h}, BLACK);
+                    // Down
+                    else if (endY > startY) DrawTriangle({(float)endX, (float)endY}, {endX+h, endY-l}, {endX-h, endY-l}, BLACK);
+                    // Up
+                    else if (endY < startY) DrawTriangle({(float)endX, (float)endY}, {endX-h,endY+l},{endX+h,endY+l}, BLACK);
                 }
             }
         }
@@ -433,20 +451,6 @@ int main()
         constexpr float y = SidePanel.y + gap;
         constexpr float step = SidePanel.height * 0.1f - gap;
         float currStep = 0;
-
-        // Dropdown
-        const int ret = GuiDropdownBox({x, y + currStep, SidePanel.width - 2 * gap, step - gap},
-            algorithmText, &algorithmActive, isAlgorithmOpen);
-        if (ret != 0)
-        {
-            isAlgorithmOpen = !isAlgorithmOpen;
-            if (!isAlgorithmOpen)
-            {
-                algorithm = static_cast<Algorithm>(algorithmActive);
-                init(cells, currentCell, algorithm);
-            }
-        }
-        currStep += isAlgorithmOpen ? step*AlgorithmSize + step : step;
         
         // Start
         if (GuiButton({x, y + currStep, SidePanel.width - 2 * gap, step - gap}, "Start"))
@@ -472,8 +476,7 @@ int main()
         // Reset
         if (GuiButton({x, y + currStep, SidePanel.width - 2 * gap, step - gap}, "Reset"))
         {
-            state = Pause;
-            init(cells, currentCell, algorithm);
+            init(cells, currentCell, backStack, algorithm, state);
         }
         currStep += step;
         
@@ -482,7 +485,22 @@ int main()
         GuiLabel({x, y + currStep, SidePanel.width - 2 * gap, step - 2 * gap}, TextFormat("Speed: %.1f", speed));
         currStep += step;
         GuiSlider({x, y + currStep, SidePanel.width - 2 * gap, step * 0.25f}, "", "", &speed, 1, 60);
-        
+        currStep += step;
+
+        // Dropdown
+        const int ret = GuiDropdownBox({x, y + currStep, SidePanel.width - 2 * gap, step - gap},
+            algorithmText, &algorithmActive, isAlgorithmOpen);
+        if (ret != 0)
+        {
+            isAlgorithmOpen = !isAlgorithmOpen;
+            if (!isAlgorithmOpen)
+            {
+                algorithm = static_cast<Algorithm>(algorithmActive);
+                init(cells, currentCell, backStack, algorithm, state);
+                continue;
+            }
+        }
+        // currStep += isAlgorithmOpen ? step*AlgorithmSize + step : step;
         EndDrawing();
     }
 
